@@ -59,9 +59,9 @@ export function tableEditing({ allowTableNodeSelection = false } = {}) {
       handlePaste
     },
 
-    appendTransaction(_, oldState, state) {
-      return normalizeSelection(state, fixTables(state, oldState), allowTableNodeSelection)
-    }
+//    appendTransaction(_, oldState, state) {
+ //     return normalizeSelection(state, fixTables(state, oldState), allowTableNodeSelection)
+//    }
   })
 }
 
