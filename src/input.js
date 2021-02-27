@@ -126,10 +126,10 @@ export function handleMouseDown(view, startEvent) {
     // cell selection to be created).
     setCellSelection($anchor, startEvent)
     startEvent.preventDefault()
-  } else if (!startDOMCell) {
+  }  // else if (!startDOMCell) {
     // Not in a cell, let the default behavior happen.
-    return
-  }
+   // return
+ // }
 
   // Create and dispatch a cell selection between the given anchor and
   // the position under the mouse.
@@ -161,6 +161,18 @@ export function handleMouseDown(view, startEvent) {
     if (anchor != null) {
       // Continuing an existing cross-cell selection
       $anchor = view.state.doc.resolve(anchor)
+} else if (  domInCell(view, event.target) && undefined == startDOMCell) {  // TODO autoriser ca uniquement si la selection est vide  ou que quelque most de texte
+	startDOMCell =  domInCell(view, event.target) 
+	 let pute = cellUnderMouse(view, event)
+	$anchor = cellAround(pute.pos)
+    // Adding to a selection that starts in another cell (causing a
+    // cell selection to be created).
+	if (pute){
+    setCellSelection(pute, event)
+	event.preventDefault()
+}
+
+
     } else if (domInCell(view, event.target) != startDOMCell) {
       // Moving out of the initial cell -- start a new cell selection
       $anchor = cellUnderMouse(view, startEvent)
