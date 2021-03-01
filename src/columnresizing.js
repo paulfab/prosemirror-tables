@@ -4,6 +4,7 @@ import {cellAround, pointsAtCell, setAttr} from "./util"
 import {TableMap} from "./tablemap"
 import {TableView, updateColumns} from "./tableview"
 import {tableNodeTypes} from "./schema"
+import {addColumn,removeColumn,addRow,removeRow} from "./commands"
 
 export const key = new PluginKey("tableColumnResizing")
 
@@ -29,7 +30,8 @@ export function columnResizing({ handleWidth = 5, cellMinWidth = 25, View = Tabl
       handleDOMEvents: {
         mousemove(view, event) { handleMouseMove(view, event, handleWidth, cellMinWidth, lastColumnResizable) },
         mouseleave(view) { handleMouseLeave(view) },
-        mousedown(view, event) { handleMouseDown(view, event, cellMinWidth) }
+        mousedown(view, event) { handleMouseDown(view, event, cellMinWidth) },
+        mouseover(view, event) { handleMouseOver(view, event) }
       },
 
       decorations(state) {
@@ -92,6 +94,55 @@ function handleMouseMove(view, event, handleWidth, cellMinWidth, lastColumnResiz
     }
   }
 }
+
+function handleMouseOver(view, event ) {
+    if(event.target.classList.contains("cell-prosemirror") && !event.target.but){
+        let found = view.posAtCoords({left: event.clientX, top: event.clientY})
+          if (!found) return -1
+           let but = create_el("div","wrapper-button-table-edit",`<div  class="button-table-edit">...</div><div class="dropdown-table" style="display:none"></div>`,{"style":"top:"+(event.target.getBoundingClientRect()["y"] - get("main_editor").getBoundingClientRect()["y"] +2 )+"px;right:"+( get("main_editor").getBoundingClientRect()["right"] - event.target.getBoundingClientRect()["right"]  +2)+"px"})
+        view.dom.parentElement.parentElement.appendChild(but)
+
+            event.target.addEventListener("mouseleave",function(e){
+                        if (but.parentElement && ! but.contains( e.relatedTarget)){
+                            event.target.but = null
+                            but.parentElement.removeChild(but)
+                            }
+                    })
+              but.addEventListener("mouseleave",function(e){
+                        event.target.but = null
+                        if (but.parentElement) but.parentElement.removeChild(but)
+                    })
+            but.onclick= function(){ but.querySelector(".dropdown-table").style["display"] = ""}
+            let $pos = cellAround(view.state.doc.resolve(found))
+            let table = $pos.node(-1), tableStart = $pos.start(-1), map = TableMap.get(table)
+            let rect = map.findCell($pos.pos - tableStart)
+            rect.tableStart = tableStart
+            rect.map = map
+            rect.table = table
+
+            let add_row = create_el("div","","Add row")
+            but.querySelector(".dropdown-table").appendChild(add_row)
+            let add_column = create_el("div","","Add column")
+            but.querySelector(".dropdown-table").appendChild(add_column)
+            let remove_row = create_el("div","","Remove row")
+            but.querySelector(".dropdown-table").appendChild(remove_row)
+            let remove_column = create_el("div","","Remove column")
+            but.querySelector(".dropdown-table").appendChild(remove_column)
+            add_column.onclick = function(){view.dispatch(addColumn(view.state.tr,rect,rect.right)) }
+            add_row.onclick = function(){view.dispatch(addRow(view.state.tr,rect,rect.bottom)) }
+            remove_column.onclick = function(){
+                let tr = view.state.tr
+                removeColumn(tr,rect,rect.right -1)
+                view.dispatch(tr) }
+            remove_row.onclick = function(){
+                let tr = view.state.tr
+                removeRow(tr,rect,rect.bottom -1)
+                view.dispatch(tr) }
+            event.target.but = but
+        }
+
+}
+
 
 function handleMouseLeave(view) {
   let pluginState = key.getState(view.state)

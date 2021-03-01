@@ -18,7 +18,7 @@ function getCellAttrs(dom, extraAttrs) {
 }
 
 function setCellAttrs(node, extraAttrs) {
-  let attrs = {}
+  let attrs = {"class":"cell-prosemirror"}
   if (node.attrs.colspan != 1) attrs.colspan = node.attrs.colspan
   if (node.attrs.rowspan != 1) attrs.rowspan = node.attrs.rowspan
   if (node.attrs.colwidth)
