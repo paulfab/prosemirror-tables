@@ -55,8 +55,10 @@ class ResizeState {
     let state = this, action = tr.getMeta(key)
     if (action && action.setHandle != null)
       return new ResizeState(action.setHandle, null)
-    if (action && action.setDragging !== undefined)
+    if (action && action.setDragging !== undefined){
+	    console.log(action)
       return new ResizeState(state.activeHandle, action.setDragging)
+    }
     if (state.activeHandle > -1 && tr.docChanged) {
       let handle = tr.mapping.map(state.activeHandle, -1)
       if (!pointsAtCell(tr.doc.resolve(handle))) handle = null
@@ -96,6 +98,10 @@ function handleMouseMove(view, event, handleWidth, cellMinWidth, lastColumnResiz
 }
 
 function handleMouseOver(view, event ) {
+	if (!view.editable)
+		return -1
+	if(key.getState(view.state).dragging)
+		return 
     if(event.target.classList.contains("cell-prosemirror") && !event.target.but){
         let found = view.posAtCoords({left: event.clientX, top: event.clientY})
           if (!found) return -1
@@ -103,6 +109,7 @@ function handleMouseOver(view, event ) {
         view.dom.parentElement.parentElement.appendChild(but)
 
             event.target.addEventListener("mouseleave",function(e){
+  			let pluginState = key.getState(view.state)
                         if (but.parentElement && ! but.contains( e.relatedTarget)){
                             event.target.but = null
                             but.parentElement.removeChild(but)
@@ -113,7 +120,11 @@ function handleMouseOver(view, event ) {
                         if (but.parentElement) but.parentElement.removeChild(but)
                     })
             but.onclick= function(){ but.querySelector(".dropdown-table").style["display"] = ""}
-            let $pos = cellAround(view.state.doc.resolve(found))
+            let $pos = cellAround(view.state.doc.resolve(found.pos))
+		if (!$pos) {
+			but.parentElement.removeChild(but)
+			return -1
+		}
             let table = $pos.node(-1), tableStart = $pos.start(-1), map = TableMap.get(table)
             let rect = map.findCell($pos.pos - tableStart)
             rect.tableStart = tableStart
@@ -153,6 +164,9 @@ function handleMouseDown(view, event, cellMinWidth) {
   let pluginState = key.getState(view.state)
   if (pluginState.activeHandle == -1 || pluginState.dragging) return false
 
+Array.from(view.dom.parentElement.parentElement.querySelectorAll(".wrapper-button-table-edit")).forEach(function(s){
+		s.parentElement.removeChild(s)})
+
   let cell = view.state.doc.nodeAt(pluginState.activeHandle)
   let width = currentColWidth(view, pluginState.activeHandle, cell.attrs)
   view.dispatch(view.state.tr.setMeta(key, {setDragging: {startX: event.clientX, startWidth: width}}))
@@ -162,15 +176,19 @@ function handleMouseDown(view, event, cellMinWidth) {
     window.removeEventListener("mousemove", move)
     let pluginState = key.getState(view.state)
     if (pluginState.dragging) {
-      updateColumnWidth(view, pluginState.activeHandle, draggedWidth(pluginState.dragging, event, cellMinWidth))
+      let width = getNewColumnWidth(view, pluginState.activeHandle, draggedWidth(pluginState.dragging, event, cellMinWidth))
+      updateColumnWidth(view, pluginState.activeHandle, width)
       view.dispatch(view.state.tr.setMeta(key, {setDragging: null}))
     }
   }
   function move(event) {
     if (!event.which) return finish(event)
     let pluginState = key.getState(view.state)
-    let dragged = draggedWidth(pluginState.dragging, event, cellMinWidth)
-    displayColumnWidth(view, pluginState.activeHandle, dragged, cellMinWidth)
+      let width = getNewColumnWidth(view, pluginState.activeHandle, draggedWidth(pluginState.dragging, event, cellMinWidth))
+    //let dragged = draggedWidth(pluginState.dragging, event, cellMinWidth)
+      console.log("dragged " + draggedWidth(pluginState.dragging, event, cellMinWidth))
+      console.log("percent " + width)
+    displayColumnWidth(view, pluginState.activeHandle, width, cellMinWidth)
   }
 
   window.addEventListener("mouseup", finish)
@@ -181,14 +199,19 @@ function handleMouseDown(view, event, cellMinWidth) {
 
 function currentColWidth(view, cellPos, {colspan, colwidth}) {
   let width = colwidth && colwidth[colwidth.length - 1]
-  if (width) return width
   let dom = view.domAtPos(cellPos)
   let node = dom.node.childNodes[dom.offset]
+  let sum_width = 0
+  colwidth.forEach(function(e){sum_width +=e})
+   return node.offsetWidth  *(width/sum_width)
   let domWidth = node.offsetWidth, parts = colspan
-  if (colwidth) for (let i = 0; i < colspan; i++) if (colwidth[i]) {
+  if (colwidth) {
+	  for (let i = 0; i < colspan; i++) if (colwidth[i]) {
     domWidth -= colwidth[i]
     parts--
   }
+  }
+	  domwWidth = domWidth * dom.closest("table").offsetWidth
   return domWidth / parts
 }
 
@@ -238,12 +261,36 @@ function updateColumnWidth(view, cell, width) {
   if (tr.docChanged) view.dispatch(tr)
 }
 
+function getNewColumnWidth(view, cell, width, cellMinWidth) {
+  let $cell = view.state.doc.resolve(cell)
+  let table = $cell.node(-1), start = $cell.start(-1)
+  let overrideCol = TableMap.get(table).colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1
+  let dom = view.domAtPos($cell.start(-1)).node
+  dom = dom.closest("table")
+
+  let totalWidth = 0
+  let row = table.firstChild
+ for (let i = 0, col = 0; i < row.childCount; i++) {
+    let {colspan, colwidth} = row.child(i).attrs
+    for (let j = 0; j < colspan; j++, col++) {
+      let cssWidth = colwidth ? colwidth[j] : 50
+	 if (col != overrideCol)
+      		totalWidth +=cssWidth
+    }
+  }
+
+  let ratio = width/dom.getBoundingClientRect()["width"]
+
+return ratio * totalWidth/(1-ratio)
+
+}
+
 function displayColumnWidth(view, cell, width, cellMinWidth) {
   let $cell = view.state.doc.resolve(cell)
   let table = $cell.node(-1), start = $cell.start(-1)
   let col = TableMap.get(table).colCount($cell.pos - start) + $cell.nodeAfter.attrs.colspan - 1
   let dom = view.domAtPos($cell.start(-1)).node
-  while (dom.nodeName != "TABLE") dom = dom.parentNode
+  dom = dom.closest("table")
   updateColumns(table, dom.firstChild, dom, cellMinWidth, col, width)
 }
 

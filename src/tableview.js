@@ -23,23 +23,32 @@ export class TableView {
 }
 
 export function updateColumns(node, colgroup, table, cellMinWidth, overrideCol, overrideValue) {
-  let totalWidth = 0, fixedWidth = true
   let nextDOM = colgroup.firstChild, row = node.firstChild
-  for (let i = 0, col = 0; i < row.childCount; i++) {
+  let has_next = !nextDOM
+  if (has_next) {
+ for (let i = 0, col = 0; i < row.childCount; i++) {
     let {colspan, colwidth} = row.child(i).attrs
     for (let j = 0; j < colspan; j++, col++) {
-      let hasWidth = overrideCol == col ? overrideValue : colwidth && colwidth[j]
-      let cssWidth = hasWidth ? hasWidth + "px" : ""
-      totalWidth += hasWidth || cellMinWidth
-      if (!hasWidth) fixedWidth = false
-      if (!nextDOM) {
-        colgroup.appendChild(document.createElement("col")).style.width = cssWidth
-      } else {
-        if (nextDOM.style.width != cssWidth) nextDOM.style.width = cssWidth
-        nextDOM = nextDOM.nextSibling
+      let cssWidth = colwidth ? colwidth[j] : 50	
+        colgroup.appendChild(document.createElement("col")).style.width = cssWidth + "%"
       }
     }
   }
+
+  nextDOM = colgroup.firstChild, row = node.firstChild
+ for (let i = 0, col = 0; i < row.childCount; i++) {
+    let {colspan, colwidth} = row.child(i).attrs
+    for (let j = 0; j < colspan; j++, col++) {
+      let hasWidth =  colwidth ? colwidth[j] : 50
+	   if (col == overrideCol)
+			hasWidth = overrideValue
+      let cssWidth = hasWidth  + "%"
+        if (nextDOM.style.width != cssWidth) nextDOM.style.width = cssWidth
+        nextDOM = nextDOM.nextSibling
+    }
+  }
+
+
 
   while (nextDOM) {
     let after = nextDOM.nextSibling
@@ -47,11 +56,11 @@ export function updateColumns(node, colgroup, table, cellMinWidth, overrideCol, 
     nextDOM = after
   }
 
-  if (fixedWidth) {
-    table.style.width = totalWidth + "px"
-    table.style.minWidth = ""
-  } else {
-    table.style.width = ""
-    table.style.minWidth = totalWidth + "px"
-  }
+//  if (fixedWidth) {
+//   table.style.width = totalWidth + "px"
+//    table.style.minWidth = ""
+//  } else {
+//    table.style.width = ""
+//   table.style.minWidth = totalWidth + "px"
+// }
 }
